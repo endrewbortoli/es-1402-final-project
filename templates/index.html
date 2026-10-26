@@ -1,0 +1,82 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+  <title>Smart Lock</title>
+  <link rel="stylesheet"
+        href="/static/style.css">
+</head>
+<body>
+  <main class="card">
+    <div class="symbol">🔐</div>
+    <h1>Smart Lock</h1>
+    <p id="status">Checking status...</p>
+
+    <input
+      id="token"
+      type="password"
+      placeholder="Enter control token"
+      autocomplete="off"
+    >
+
+    <button class="lock" onclick="control('locked')">
+      🔒 Lock
+    </button>
+
+    <button class="unlock" onclick="control('unlocked')">
+      🔓 Unlock
+    </button>
+
+    <p class="note">Raspberry Pi Smart Lock Prototype</p>
+  </main>
+
+  <script>
+    async function control(action) {
+      const status = document.getElementById("status");
+      const token = document.getElementById("token").value;
+
+      status.textContent = "Sending command...";
+
+      try {
+        const response = await fetch("/api/control", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Lock-Token": token
+          },
+          body: JSON.stringify({ action })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || "Request failed");
+        }
+
+        status.textContent = "Commanded: " + result.state;
+      } catch (error) {
+        status.textContent = "Error: " + error.message;
+      }
+    }
+
+    async function checkStatus() {
+      try {
+        const response = await fetch("/api/status");
+        const result = await response.json();
+
+        document.getElementById("status").textContent =
+          "Last command: " + result.state +
+          (result.simulation ? " (simulation)" : "");
+      } catch {
+        document.getElementById("status").textContent =
+          "Unable to connect";
+      }
+    }
+
+    checkStatus();
+  </script>
+</body>
+</html>
