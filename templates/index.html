@@ -6,8 +6,7 @@
   <meta name="viewport"
         content="width=device-width, initial-scale=1">
   <title>Smart Lock</title>
-  <link rel="stylesheet"
-        href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
   <main class="card">
@@ -15,29 +14,77 @@
     <h1>Smart Lock</h1>
     <p id="status">Checking status...</p>
 
-    <input
-      id="token"
-      type="password"
-      placeholder="Enter control token"
-      autocomplete="off"
-    >
+    <div class="pin-dots" id="dots">
+      <span></span><span></span><span></span><span></span>
+    </div>
 
-    <button class="lock" onclick="control('locked')">
-      🔒 Lock
-    </button>
+    <div class="keypad">
+      <button onclick="digit('1')">1</button>
+      <button onclick="digit('2')">2</button>
+      <button onclick="digit('3')">3</button>
+      <button onclick="digit('4')">4</button>
+      <button onclick="digit('5')">5</button>
+      <button onclick="digit('6')">6</button>
+      <button onclick="digit('7')">7</button>
+      <button onclick="digit('8')">8</button>
+      <button onclick="digit('9')">9</button>
+      <button onclick="clearPin()">C</button>
+      <button onclick="digit('0')">0</button>
+      <button onclick="backspace()">⌫</button>
+    </div>
 
-    <button class="unlock" onclick="control('unlocked')">
-      🔓 Unlock
-    </button>
+    <div class="actions">
+      <button class="lock" onclick="control('locked')">
+        🔒 Lock
+      </button>
+      <button class="unlock" onclick="control('unlocked')">
+        🔓 Unlock
+      </button>
+    </div>
 
     <p class="note">Raspberry Pi Smart Lock Prototype</p>
   </main>
 
   <script>
+    let pin = "";
+    let busy = false;
+
+    function updateDots() {
+      const dots = document.querySelectorAll("#dots span");
+      dots.forEach((dot, index) => {
+        dot.classList.toggle("filled", index < pin.length);
+      });
+    }
+
+    function digit(number) {
+      if (busy || pin.length >= 4) return;
+      pin += number;
+      updateDots();
+    }
+
+    function clearPin() {
+      if (busy) return;
+      pin = "";
+      updateDots();
+    }
+
+    function backspace() {
+      if (busy) return;
+      pin = pin.slice(0, -1);
+      updateDots();
+    }
+
     async function control(action) {
       const status = document.getElementById("status");
-      const token = document.getElementById("token").value;
 
+      if (busy) return;
+
+      if (pin.length !== 4) {
+        status.textContent = "Enter your 4-digit PIN first";
+        return;
+      }
+
+      busy = true;
       status.textContent = "Sending command...";
 
       try {
@@ -45,7 +92,7 @@
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-Lock-Token": token
+            "X-Lock-Token": pin
           },
           body: JSON.stringify({ action })
         });
@@ -53,12 +100,20 @@
         const result = await response.json();
 
         if (!response.ok) {
-          throw new Error(result.error || "Request failed");
+          throw new Error(
+            response.status === 401
+              ? "Incorrect PIN"
+              : result.error || "Request failed"
+          );
         }
 
         status.textContent = "Commanded: " + result.state;
       } catch (error) {
-        status.textContent = "Error: " + error.message;
+        status.textContent = error.message;
+      } finally {
+        pin = "";
+        updateDots();
+        busy = false;
       }
     }
 
